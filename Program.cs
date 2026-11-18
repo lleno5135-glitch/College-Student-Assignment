@@ -133,16 +133,21 @@ sealed class Db(IConfiguration config) {
         get {
             var configured = config.GetConnectionString("DefaultConnection");
             if(string.IsNullOrWhiteSpace(configured)) throw new InvalidOperationException("Set the ConnectionStrings:DefaultConnection configuration value.");
-            if(!Uri.TryCreate(configured, UriKind.Absolute, out var uri) || (uri.Scheme != "postgres" && uri.Scheme != "postgresql")) return configured;
-            var separator = uri.UserInfo.IndexOf(':');
-            if(separator < 0) throw new InvalidOperationException("The PostgreSQL URL must include a username and password.");
-            var connectionString = new NpgsqlConnectionStringBuilder {
-                Host = uri.Host,
-                Port = uri.IsDefaultPort ? 5432 : uri.Port,
-                Database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/')),
-                Username = Uri.UnescapeDataString(uri.UserInfo[..separator]),
-                Password = Uri.UnescapeDataString(uri.UserInfo[(separator + 1)..])
-            };
+            NpgsqlConnectionStringBuilder connectionString;
+            if(Uri.TryCreate(configured, UriKind.Absolute, out var uri) && (uri.Scheme == "postgres" || uri.Scheme == "postgresql")) {
+                var separator = uri.UserInfo.IndexOf(':');
+                if(separator < 0) throw new InvalidOperationException("The PostgreSQL URL must include a username and password.");
+                connectionString = new NpgsqlConnectionStringBuilder {
+                    Host = uri.Host,
+                    Port = uri.IsDefaultPort ? 5432 : uri.Port,
+                    Database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/')),
+                    Username = Uri.UnescapeDataString(uri.UserInfo[..separator]),
+                    Password = Uri.UnescapeDataString(uri.UserInfo[(separator + 1)..])
+                };
+            } else {
+                connectionString = new NpgsqlConnectionStringBuilder(configured);
+            }
+            connectionString.SearchPath = "college_assignment";
             return connectionString.ConnectionString;
         }
     }

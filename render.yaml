@@ -13,12 +13,11 @@ services:
         value: Production
       - key: ConnectionStrings__DefaultConnection
         fromDatabase:
-          name: college-assignment-db
+          name: connect-db
           property: connectionString
 
 databases:
-  - name: college-assignment-db
-    databaseName: collegeassignmentportal
-    user: portal_user
+  - name: connect-db
+    databaseName: connect_db_btof
     plan: free
     region: singapore

@@ -28,10 +28,10 @@ The app creates the schema and demo users from `database.sql` at startup.
 ## Deploy to Render
 1. Push this repository to GitHub.
 2. In Render, open the existing `college-assignment-portal` Blueprint and sync it with `render.yaml`.
-3. Review and apply the free web service and free PostgreSQL database configuration in Singapore.
+3. Review the free web service configuration. The app uses the existing `connect-db` PostgreSQL database in Singapore and stores its tables in an isolated `college_assignment` schema.
 4. Open the deployed service URL after the first successful deploy.
 
-The free web service sleeps after inactivity; uploaded files are temporary and can disappear on restarts or redeploys. The free PostgreSQL database expires after 30 days. Render requires paid resources for persistent service disks.
+The free web service sleeps after inactivity; uploaded files are temporary and can disappear on restarts or redeploys. The reused free PostgreSQL database expires after 30 days. Render requires paid resources for persistent service disks.
 
 ## Demo logins
 - Admin: `admin@college.com` / `Admin@123`
