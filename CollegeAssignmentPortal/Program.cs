@@ -36,7 +36,7 @@ app.MapGet("/login", (HttpContext c) => Results.Content(Page(c,"Login", """
 """),"text/html"));
 app.MapPost("/login", async (HttpContext c, Db db) => {
     var f = await c.Request.ReadFormAsync();
-    var row = await db.One("SELECT FullName, Role FROM Users WHERE Email=@e AND PasswordHash=@p AND IsActive=1", ("@e",f["email"].ToString()),("@p",f["password"].ToString()));
+    var row = await db.One("SELECT UserId, FullName, Role FROM Users WHERE Email=@e AND PasswordHash=@p AND IsActive=1", ("@e",f["email"].ToString()),("@p",f["password"].ToString()));
     if(row == null) return Results.Content(Page(c,"Login failed","<div class='alert alert-danger'>Invalid email or password. <a href='/login'>Try again</a></div>"),"text/html");
     c.Session.SetString("User", Convert.ToString(row["FullName"])!);
     c.Session.SetString("Role", Convert.ToString(row["Role"])!);

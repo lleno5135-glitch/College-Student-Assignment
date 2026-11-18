@@ -30,6 +30,9 @@ dotnet run
 
 Open the localhost URL printed in the terminal.
 
+## Deploy to Render
+The repository includes a Render Blueprint and Dockerfile. In Render, create a new Blueprint from this repository and set `ConnectionStrings__DefaultConnection` to the connection string for your hosted SQL Server. The database must allow connections from Render. Uploaded assignment files are stored on the web service's local disk and are not persistent on Render's free plan.
+
 ## Demo logins
 - Admin: `admin@college.com` / `Admin@123`
 - Staff: `staff@college.com` / `Staff@123`
