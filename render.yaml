@@ -3,7 +3,10 @@ services:
     name: college-assignment-portal
     runtime: docker
     plan: free
-    region: oregon
+    region: singapore
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
@@ -18,4 +21,4 @@ databases:
     databaseName: collegeassignmentportal
     user: portal_user
     plan: free
-    region: oregon
+    region: singapore

@@ -27,8 +27,8 @@ The app creates the schema and demo users from `database.sql` at startup.
 
 ## Deploy to Render
 1. Push this repository to GitHub.
-2. In Render, choose **New > Blueprint** and select `lleno5135-glitch/College-Student-Assignment`.
-3. Review and apply `render.yaml`. It creates a free web service and free PostgreSQL database in Oregon.
+2. In Render, open the existing `college-assignment-portal` Blueprint and sync it with `render.yaml`.
+3. Review and apply the free web service and free PostgreSQL database configuration in Singapore.
 4. Open the deployed service URL after the first successful deploy.
 
 The free web service sleeps after inactivity; uploaded files are temporary and can disappear on restarts or redeploys. The free PostgreSQL database expires after 30 days. Render requires paid resources for persistent service disks.
