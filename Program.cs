@@ -1,12 +1,13 @@
-using System.Data;
 using System.Net;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+if(int.TryParse(Environment.GetEnvironmentVariable("PORT"), out var renderPort)) builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(o => { o.IdleTimeout = TimeSpan.FromHours(4); o.Cookie.HttpOnly = true; o.Cookie.IsEssential = true; });
 builder.Services.AddSingleton<Db>();
 var app = builder.Build();
+await app.Services.GetRequiredService<Db>().InitializeAsync(Path.Combine(app.Environment.ContentRootPath, "database.sql"));
 app.UseStaticFiles();
 app.UseSession();
 
@@ -82,7 +83,7 @@ app.MapGet("/assignments/new", (HttpContext c) => {
 app.MapPost("/assignments/new", async (HttpContext c, Db db) => {
     if(!Role(c,"Staff","Admin")) return Results.Forbid();
     var f=await c.Request.ReadFormAsync();
-    await db.Exec("INSERT INTO Assignments(Title,Subject,Description,DueDate,StaffId,CreatedAt) VALUES(@t,@s,@d,@due,@id,GETDATE())",
+    await db.Exec("INSERT INTO Assignments(Title,Subject,Description,DueDate,StaffId,CreatedAt) VALUES(@t,@s,@d,@due,@id,CURRENT_TIMESTAMP)",
         ("@t",f["title"].ToString()),("@s",f["subject"].ToString()),("@d",f["description"].ToString()),("@due",DateTime.Parse(f["dueDate"]!)),("@id",c.Session.GetInt32("UserId")!.Value));
     return Results.Redirect("/assignments");
 });
@@ -105,7 +106,7 @@ app.MapPost("/assignments/{id:int}/submit", async (HttpContext c,int id,Db db) =
     if(!new[]{".pdf",".doc",".docx"}.Contains(ext) || file.Length>10*1024*1024) return Results.BadRequest("Only PDF/DOC/DOCX files up to 10 MB are allowed.");
     var folder=Path.Combine(app.Environment.ContentRootPath,"wwwroot","uploads"); Directory.CreateDirectory(folder);
     var stored=$"{Guid.NewGuid()}{ext}"; using(var stream=File.Create(Path.Combine(folder,stored))) await file.CopyToAsync(stream);
-    await db.Exec("INSERT INTO Submissions(AssignmentId,StudentId,FileName,StoredName,SubmittedAt,Status) VALUES(@a,@s,@f,@n,GETDATE(),'Submitted')",
+    await db.Exec("INSERT INTO Submissions(AssignmentId,StudentId,FileName,StoredName,SubmittedAt,Status) VALUES(@a,@s,@f,@n,CURRENT_TIMESTAMP,'Submitted')",
         ("@a",id),("@s",c.Session.GetInt32("UserId")!.Value),("@f",Path.GetFileName(file.FileName)),("@n",stored));
     return Results.Redirect("/my-submissions");
 });
@@ -128,20 +129,45 @@ app.MapGet("/staff/submissions", async (HttpContext c,Db db) => {
 app.Run();
 
 sealed class Db(IConfiguration config) {
-    string Cs => config.GetConnectionString("DefaultConnection")!;
+    string Cs {
+        get {
+            var configured = config.GetConnectionString("DefaultConnection");
+            if(string.IsNullOrWhiteSpace(configured)) throw new InvalidOperationException("Set the ConnectionStrings:DefaultConnection configuration value.");
+            if(!Uri.TryCreate(configured, UriKind.Absolute, out var uri) || (uri.Scheme != "postgres" && uri.Scheme != "postgresql")) return configured;
+            var separator = uri.UserInfo.IndexOf(':');
+            if(separator < 0) throw new InvalidOperationException("The PostgreSQL URL must include a username and password.");
+            var connectionString = new NpgsqlConnectionStringBuilder {
+                Host = uri.Host,
+                Port = uri.IsDefaultPort ? 5432 : uri.Port,
+                Database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/')),
+                Username = Uri.UnescapeDataString(uri.UserInfo[..separator]),
+                Password = Uri.UnescapeDataString(uri.UserInfo[(separator + 1)..])
+            };
+            return connectionString.ConnectionString;
+        }
+    }
+    public async Task InitializeAsync(string schemaPath) {
+        var statements = await File.ReadAllTextAsync(schemaPath);
+        await using var con = new NpgsqlConnection(Cs);
+        await con.OpenAsync();
+        foreach(var statement in statements.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
+            await using var cmd = new NpgsqlCommand(statement, con);
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
     public async Task<Dictionary<string,object>?> One(string sql, params (string,object)[] p) {
-        await using var con=new SqlConnection(Cs); await con.OpenAsync();
-        await using var cmd=new SqlCommand(sql,con); foreach(var x in p) cmd.Parameters.AddWithValue(x.Item1,x.Item2??DBNull.Value);
+        await using var con=new NpgsqlConnection(Cs); await con.OpenAsync();
+        await using var cmd=new NpgsqlCommand(sql,con); foreach(var x in p) cmd.Parameters.AddWithValue(x.Item1,x.Item2??DBNull.Value);
         await using var rd=await cmd.ExecuteReaderAsync(); if(!await rd.ReadAsync()) return null;
-        var d=new Dictionary<string,object>(); for(int i=0;i<rd.FieldCount;i++) d[rd.GetName(i)]=rd.GetValue(i); return d;
+        var d=new Dictionary<string,object>(StringComparer.OrdinalIgnoreCase); for(int i=0;i<rd.FieldCount;i++) d[rd.GetName(i)]=rd.GetValue(i); return d;
     }
     public async Task<List<Dictionary<string,object>>> Many(string sql, params (string,object)[] p) {
-        var list=new List<Dictionary<string,object>>(); await using var con=new SqlConnection(Cs); await con.OpenAsync();
-        await using var cmd=new SqlCommand(sql,con); foreach(var x in p) cmd.Parameters.AddWithValue(x.Item1,x.Item2??DBNull.Value);
-        await using var rd=await cmd.ExecuteReaderAsync(); while(await rd.ReadAsync()){var d=new Dictionary<string,object>();for(int i=0;i<rd.FieldCount;i++)d[rd.GetName(i)]=rd.GetValue(i);list.Add(d);} return list;
+        var list=new List<Dictionary<string,object>>(); await using var con=new NpgsqlConnection(Cs); await con.OpenAsync();
+        await using var cmd=new NpgsqlCommand(sql,con); foreach(var x in p) cmd.Parameters.AddWithValue(x.Item1,x.Item2??DBNull.Value);
+        await using var rd=await cmd.ExecuteReaderAsync(); while(await rd.ReadAsync()){var d=new Dictionary<string,object>(StringComparer.OrdinalIgnoreCase);for(int i=0;i<rd.FieldCount;i++)d[rd.GetName(i)]=rd.GetValue(i);list.Add(d);} return list;
     }
     public async Task Exec(string sql, params (string,object)[] p) {
-        await using var con=new SqlConnection(Cs); await con.OpenAsync(); await using var cmd=new SqlCommand(sql,con);
+        await using var con=new NpgsqlConnection(Cs); await con.OpenAsync(); await using var cmd=new NpgsqlCommand(sql,con);
         foreach(var x in p) cmd.Parameters.AddWithValue(x.Item1,x.Item2??DBNull.Value); await cmd.ExecuteNonQueryAsync();
     }
 }

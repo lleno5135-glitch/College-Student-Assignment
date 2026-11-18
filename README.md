@@ -1,6 +1,6 @@
 # College Assignment Portal (.NET 10)
 
-A beginner-friendly ASP.NET Core Minimal API + HTML portal using SQL Server and ADO.NET.
+A beginner-friendly ASP.NET Core Minimal API + HTML portal using PostgreSQL and ADO.NET.
 
 ## Included
 - Login for Admin, Staff and Student demo accounts
@@ -12,23 +12,26 @@ A beginner-friendly ASP.NET Core Minimal API + HTML portal using SQL Server and 
 
 ## Requirements
 - .NET 10 SDK
-- SQL Server LocalDB (or SQL Server)
+- PostgreSQL
 - Visual Studio 2022 with ASP.NET workload, or VS Code
 
-## 1. Create database
-Open SQL Server Management Studio (SSMS), connect to `(localdb)\\MSSQLLocalDB`, open `database.sql`, and execute it.
-
-If using another SQL Server instance, change `DefaultConnection` in `appsettings.json`.
-
-## 2. Run
-Open PowerShell in this folder:
+## Run locally
+Create a PostgreSQL database, set its connection string in the environment, and run:
 
 ```powershell
-dotnet restore
+$env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5432;Database=CollegeAssignmentPortal;Username=postgres;Password=YOUR_PASSWORD"
 dotnet run
 ```
 
-Open the localhost URL printed in the terminal.
+The app creates the schema and demo users from `database.sql` at startup.
+
+## Deploy to Render
+1. Push this repository to GitHub.
+2. In Render, choose **New > Blueprint** and select `lleno5135-glitch/College-Student-Assignment`.
+3. Review and apply `render.yaml`. It creates a free web service and free PostgreSQL database in Oregon.
+4. Open the deployed service URL after the first successful deploy.
+
+The free web service sleeps after inactivity; uploaded files are temporary and can disappear on restarts or redeploys. The free PostgreSQL database expires after 30 days. Render requires paid resources for persistent service disks.
 
 ## Demo logins
 - Admin: `admin@college.com` / `Admin@123`
@@ -36,7 +39,7 @@ Open the localhost URL printed in the terminal.
 - Student: `student@college.com` / `Student@123`
 
 ## Important learning/demo limitations
-This is an academic starter project, not production-ready authentication. Passwords are plain text only to keep the first version easy to understand. Before real deployment, replace this with ASP.NET Core Identity or a secure password-hashing implementation, add CSRF protection, validate authorization at the record level, and configure upload malware scanning and private file storage.
+This is an academic demo, not production-ready authentication. Passwords are plain text and the demo accounts are seeded automatically. Before production use, replace this with ASP.NET Core Identity or secure password hashing, add CSRF protection, validate authorization at the record level, and use private, persistent file storage with malware scanning.
 
 The Staff submissions page is `/staff/submissions`.
 
@@ -45,3 +48,5 @@ The Staff submissions page is `/staff/submissions`.
 - Fixed login to retrieve the UserId required by the session.
 - Added the Staff/Admin submissions page to navigation and dashboard.
 - Added the explicit System.Net import for HTML encoding.
+- Migrated SQL Server data access and schema to PostgreSQL for Render.
+- Added a Dockerfile and Render Blueprint for a free demo deployment.
